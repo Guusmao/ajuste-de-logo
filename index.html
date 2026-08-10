@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ajustador de logo</title>
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Ferramenta interna · v1</p>
+    <h1>Ajustador de logo</h1>
+    <p class="sub">Remove o fundo, encaixa sem esticar e exporta em 512×512 ou 1024×500.</p>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="section">
+        <span class="label">01 · Imagem</span>
+        <div class="drop" id="dropZone">
+          <p id="dropText">Arraste um PNG/JPG aqui<br>ou clique para escolher</p>
+          <input type="file" id="fileInput" accept="image/*">
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="label">02 · Fundo</span>
+        <div class="row">
+          <span>Tolerância</span>
+          <input type="range" id="tolerance" min="5" max="120" value="40">
+        </div>
+        <div class="row">
+          <span>Suavizar borda</span>
+          <input type="range" id="feather" min="0" max="60" value="25">
+        </div>
+        <p class="pick-hint">Clique na imagem à esquerda pra escolher a cor do fundo. Ponto atual: <b id="pickedColorLabel">canto superior esquerdo</b></p>
+      </div>
+
+      <div class="section">
+        <span class="label">03 · Tamanho final</span>
+        <div class="size-opts">
+          <label class="size-opt active" data-w="512" data-h="512">
+            <input type="radio" name="size" checked> 512 × 512
+          </label>
+          <label class="size-opt" data-w="1024" data-h="500">
+            <input type="radio" name="size"> 1024 × 500
+          </label>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="label">04 · Fundo do quadro</span>
+        <div class="row">
+          <div class="chk">
+            <input type="checkbox" id="transparentBg" checked>
+            <label for="transparentBg">Manter transparente</label>
+          </div>
+          <input type="color" id="padColor" value="#ffffff" disabled>
+        </div>
+      </div>
+
+      <div class="section">
+        <button class="primary" id="downloadBtn" disabled>Baixar PNG</button>
+      </div>
+    </div>
+
+    <div class="panel canvas-area" id="canvasArea">
+      <div class="empty-hint">
+        <i>▢</i>
+        Envie uma imagem pra começar.<br>O resultado aparece aqui, do lado.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="index.js"></script>
+</body>
+</html>
