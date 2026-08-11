@@ -26,7 +26,3 @@ Ferramenta web para remover fundos de imagens, encaixar logos sem distorcer e ex
 - **Suavizar borda**: quão suave é a transição das bordas (0-60)
 - **Tamanho final**: 512×512 (quadrado) ou 1024×500 (paisagem)
 - **Fundo**: manter transparente ou usar uma cor
-
----
-
-Feito com ❤️ pra facilitar o trabalho com logos
