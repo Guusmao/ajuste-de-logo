@@ -4,6 +4,7 @@ const canvasArea = document.getElementById('canvasArea');
 const toleranceEl = document.getElementById('tolerance');
 const featherEl = document.getElementById('feather');
 const transparentBgEl = document.getElementById('transparentBg');
+const autoCropBgEl = document.getElementById('autoCropBg');
 const padColorEl = document.getElementById('padColor');
 const downloadBtn = document.getElementById('downloadBtn');
 const pickedColorLabel = document.getElementById('pickedColorLabel');
@@ -133,9 +134,47 @@ function removeBackground(){
   return tmp;
 }
 
+function getContentBounds(canvas){
+  const ctx = canvas.getContext('2d', {willReadFrequently:true});
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
+
+  for(let i=0; i<data.length; i+=4){
+    if(data[i+3] > 0){
+      const pixelIndex = i / 4;
+      const x = pixelIndex % canvas.width;
+      const y = Math.floor(pixelIndex / canvas.width);
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if(maxX < 0) return null;
+  return {x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1};
+}
+
+function cropCanvas(canvas, bounds){
+  if(!bounds) return canvas;
+  const cropped = document.createElement('canvas');
+  cropped.width = bounds.w;
+  cropped.height = bounds.h;
+  const ctx = cropped.getContext('2d');
+  ctx.drawImage(canvas, bounds.x, bounds.y, bounds.w, bounds.h, 0, 0, bounds.w, bounds.h);
+  return cropped;
+}
+
 function render(){
   if(!img) return;
-  const cleaned = removeBackground();
+  let cleaned = removeBackground();
+
+  if(autoCropBgEl.checked){
+    const bounds = getContentBounds(cleaned);
+    if(bounds) cleaned = cropCanvas(cleaned, bounds);
+  }
 
   const maxOutW = 340;
   const dispScale = Math.min(1, maxOutW / targetW);
@@ -173,11 +212,18 @@ transparentBgEl.addEventListener('change', ()=>{
   padColorEl.disabled = transparentBgEl.checked;
   render();
 });
+autoCropBgEl.addEventListener('change', render);
 padColorEl.addEventListener('input', render);
 
 downloadBtn.addEventListener('click', ()=>{
   if(!img) return;
-  const cleaned = removeBackground();
+  let cleaned = removeBackground();
+
+  if(autoCropBgEl.checked){
+    const bounds = getContentBounds(cleaned);
+    if(bounds) cleaned = cropCanvas(cleaned, bounds);
+  }
+
   const final = document.createElement('canvas');
   final.width = targetW;
   final.height = targetH;
