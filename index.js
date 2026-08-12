@@ -163,6 +163,20 @@ function getContentBounds(canvas){
   };
 }
 
+function cleanupSoftEdges(canvas){
+  const ctx = canvas.getContext('2d', {willReadFrequently:true});
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  for(let i=0; i<data.length; i+=4){
+    if(data[i+3] < 150){
+      data[i+3] = 0;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
 function cropCanvas(canvas, bounds){
   if(!bounds) return canvas;
   const cropped = document.createElement('canvas');
@@ -178,6 +192,7 @@ function render(){
   let cleaned = removeBackground();
 
   if(autoCropBgEl.checked){
+    cleaned = cleanupSoftEdges(cleaned);
     const bounds = getContentBounds(cleaned);
     if(bounds) cleaned = cropCanvas(cleaned, bounds);
   }
@@ -233,6 +248,7 @@ downloadBtn.addEventListener('click', ()=>{
   let cleaned = removeBackground();
 
   if(autoCropBgEl.checked){
+    cleaned = cleanupSoftEdges(cleaned);
     const bounds = getContentBounds(cleaned);
     if(bounds) cleaned = cropCanvas(cleaned, bounds);
   }
