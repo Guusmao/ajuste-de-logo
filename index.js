@@ -253,20 +253,31 @@ downloadBtn.addEventListener('click', ()=>{
     if(bounds) cleaned = cropCanvas(cleaned, bounds);
   }
 
+  const upscale = 2;
+  const finalW = targetW * upscale;
+  const finalH = targetH * upscale;
+  const upscaled = document.createElement('canvas');
+  upscaled.width = finalW;
+  upscaled.height = finalH;
+  const uctx = upscaled.getContext('2d');
+  uctx.imageSmoothingEnabled = true;
+  if(!transparentBgEl.checked){
+    uctx.fillStyle = padColorEl.value;
+    uctx.fillRect(0,0,finalW, finalH);
+  }
+  const scale = Math.min(finalW / cleaned.width, finalH / cleaned.height);
+  const drawW = cleaned.width * scale;
+  const drawH = cleaned.height * scale;
+  const dx = (finalW - drawW) / 2;
+  const dy = (finalH - drawH) / 2;
+  uctx.drawImage(cleaned, dx, dy, drawW, drawH);
+
   const final = document.createElement('canvas');
   final.width = targetW;
   final.height = targetH;
   const fctx = final.getContext('2d');
-  if(!transparentBgEl.checked){
-    fctx.fillStyle = padColorEl.value;
-    fctx.fillRect(0,0,targetW,targetH);
-  }
-  const scale = Math.min(targetW / cleaned.width, targetH / cleaned.height);
-  const drawW = cleaned.width * scale;
-  const drawH = cleaned.height * scale;
-  const dx = (targetW - drawW) / 2;
-  const dy = (targetH - drawH) / 2;
-  fctx.drawImage(cleaned, dx, dy, drawW, drawH);
+  fctx.imageSmoothingEnabled = true;
+  fctx.drawImage(upscaled, 0, 0, finalW, finalH, 0, 0, targetW, targetH);
 
   final.toBlob(blob=>{
     const url = URL.createObjectURL(blob);
