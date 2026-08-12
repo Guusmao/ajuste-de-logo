@@ -142,7 +142,7 @@ function getContentBounds(canvas){
   let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
 
   for(let i=0; i<data.length; i+=4){
-    if(data[i+3] > 0){
+    if(data[i+3] > 200){
       const pixelIndex = i / 4;
       const x = pixelIndex % canvas.width;
       const y = Math.floor(pixelIndex / canvas.width);
@@ -154,7 +154,13 @@ function getContentBounds(canvas){
   }
 
   if(maxX < 0) return null;
-  return {x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1};
+  const padding = 3;
+  return {
+    x: Math.max(0, minX - padding),
+    y: Math.max(0, minY - padding),
+    w: Math.min(canvas.width, maxX - minX + 1 + padding * 2),
+    h: Math.min(canvas.height, maxY - minY + 1 + padding * 2)
+  };
 }
 
 function cropCanvas(canvas, bounds){
