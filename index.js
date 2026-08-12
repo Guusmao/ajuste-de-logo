@@ -218,7 +218,14 @@ transparentBgEl.addEventListener('change', ()=>{
   padColorEl.disabled = transparentBgEl.checked;
   render();
 });
-autoCropBgEl.addEventListener('change', render);
+autoCropBgEl.addEventListener('change', ()=>{
+  if(autoCropBgEl.checked){
+    transparentBgEl.checked = false;
+    padColorEl.disabled = false;
+    padColorEl.value = '#ffffff';
+  }
+  render();
+});
 padColorEl.addEventListener('input', render);
 
 downloadBtn.addEventListener('click', ()=>{
