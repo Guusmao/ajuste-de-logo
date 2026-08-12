@@ -142,7 +142,7 @@ function getContentBounds(canvas){
   let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
 
   for(let i=0; i<data.length; i+=4){
-    if(data[i+3] > 200){
+    if(data[i+3] > 220){
       const pixelIndex = i / 4;
       const x = pixelIndex % canvas.width;
       const y = Math.floor(pixelIndex / canvas.width);
@@ -169,7 +169,7 @@ function cleanupSoftEdges(canvas){
   const data = imageData.data;
 
   for(let i=0; i<data.length; i+=4){
-    if(data[i+3] < 150){
+    if(data[i+3] < 220){
       data[i+3] = 0;
     }
   }
