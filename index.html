@@ -20,9 +20,27 @@
       <div class="section">
         <span class="label">01 · Imagem</span>
         <div class="drop" id="dropZone">
-          <p id="dropText">Arraste um PNG/JPG aqui<br>ou clique para escolher</p>
-          <input type="file" id="fileInput" accept="image/*">
+          <p id="dropText">Arraste um PNG/JPG/PDF aqui<br>ou clique para escolher</p>
+          <input type="file" id="fileInput" accept="image/*,.pdf">
         </div>
+      </div>
+
+      <div class="section" id="pdfSection" style="display:none;">
+        <span class="label">PDF · Configurar</span>
+        <div class="row">
+          <span>Página</span>
+          <select id="pdfPage" style="flex:1;"></select>
+        </div>
+        <div class="row">
+          <span>Resolução (DPI)</span>
+          <select id="pdfDpi" style="flex:1;">
+            <option value="72">72 DPI (rápido)</option>
+            <option value="150" selected>150 DPI (normal)</option>
+            <option value="300">300 DPI (alta)</option>
+            <option value="600">600 DPI (muito alta)</option>
+          </select>
+        </div>
+        <button id="pdfConfirmBtn" style="width:100%; margin-top:10px;">Confirmar</button>
       </div>
 
       <div class="section">
@@ -79,6 +97,8 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <script src="index.js"></script>
 </body>
 </html>

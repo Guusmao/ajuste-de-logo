@@ -39,6 +39,10 @@ fileInput.addEventListener('change', e=>{
 });
 
 function loadFile(file){
+  if (file.type === 'application/pdf') {
+    handlePdf(file);
+    return;
+  }
   const reader = new FileReader();
   reader.onload = ev=>{
     const image = new Image();
@@ -53,6 +57,51 @@ function loadFile(file){
     image.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+async function handlePdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+  const pageSelect = document.getElementById('pdfPage');
+  pageSelect.innerHTML = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `Página ${i}`;
+    pageSelect.appendChild(opt);
+  }
+  document.getElementById('pdfSection').style.display = 'block';
+
+  document.getElementById('pdfConfirmBtn').onclick = async () => {
+    const pageNum = parseInt(pageSelect.value);
+    const dpi = parseInt(document.getElementById('pdfDpi').value);
+    const page = await pdf.getPage(pageNum);
+    const scale = dpi / 72;
+    const viewport = page.getViewport({scale});
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    await page.render({
+      canvasContext: ctx,
+      viewport: viewport
+    }).promise;
+
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      pickPoint = null;
+      pickedColorLabel.textContent = 'canto superior esquerdo';
+      buildLayout();
+      render();
+      downloadBtn.disabled = false;
+      document.getElementById('pdfSection').style.display = 'none';
+    };
+    image.src = canvas.toDataURL();
+  };
 }
 
 function buildLayout(){
@@ -243,6 +292,43 @@ autoCropBgEl.addEventListener('change', ()=>{
 });
 padColorEl.addEventListener('input', render);
 
+function getUpscaleFactor(imgWidth, imgHeight) {
+  const minDim = Math.min(imgWidth, imgHeight);
+  if (minDim <= 256) return 4;
+  if (minDim <= 384) return 3;
+  if (minDim <= 512) return 2;
+  return 1.5;
+}
+
+function applyUnsharpMask(canvas, strength = 1.2) {
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const w = canvas.width, h = canvas.height;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelIndex = i / 4;
+    const x = pixelIndex % w;
+    const y = Math.floor(pixelIndex / w);
+
+    if (x > 0 && x < w-1 && y > 0 && y < h-1) {
+      for (let c = 0; c < 3; c++) {
+        const center = data[i + c];
+        const top = data[(i - w*4) + c];
+        const bottom = data[(i + w*4) + c];
+        const left = data[(i - 4) + c];
+        const right = data[(i + 4) + c];
+
+        const avg = (top + bottom + left + right) / 4;
+        const diff = center - avg;
+        data[i + c] = Math.min(255, Math.max(0, center + diff * strength));
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
 downloadBtn.addEventListener('click', ()=>{
   if(!img) return;
   let cleaned = removeBackground();
@@ -253,7 +339,7 @@ downloadBtn.addEventListener('click', ()=>{
     if(bounds) cleaned = cropCanvas(cleaned, bounds);
   }
 
-  const upscale = 2;
+  const upscale = getUpscaleFactor(img.width, img.height);
   const finalW = targetW * upscale;
   const finalH = targetH * upscale;
   const upscaled = document.createElement('canvas');
@@ -271,6 +357,8 @@ downloadBtn.addEventListener('click', ()=>{
   const dx = (finalW - drawW) / 2;
   const dy = (finalH - drawH) / 2;
   uctx.drawImage(cleaned, dx, dy, drawW, drawH);
+
+  applyUnsharpMask(upscaled);
 
   const final = document.createElement('canvas');
   final.width = targetW;
