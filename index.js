@@ -59,6 +59,23 @@ function loadFile(file){
   reader.readAsDataURL(file);
 }
 
+function resizeCanvasProportional(canvas, maxDim = 1024) {
+  const maxDimension = Math.max(canvas.width, canvas.height);
+  if (maxDimension <= maxDim) return canvas;
+
+  const scale = maxDim / maxDimension;
+  const newW = Math.round(canvas.width * scale);
+  const newH = Math.round(canvas.height * scale);
+
+  const resized = document.createElement('canvas');
+  resized.width = newW;
+  resized.height = newH;
+  const ctx = resized.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(canvas, 0, 0, newW, newH);
+  return resized;
+}
+
 async function handlePdf(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -90,6 +107,8 @@ async function handlePdf(file) {
       viewport: viewport
     }).promise;
 
+    const resized = resizeCanvasProportional(canvas, 1024);
+
     const image = new Image();
     image.onload = () => {
       img = image;
@@ -100,7 +119,7 @@ async function handlePdf(file) {
       downloadBtn.disabled = false;
       document.getElementById('pdfSection').style.display = 'none';
     };
-    image.src = canvas.toDataURL();
+    image.src = resized.toDataURL();
   };
 }
 
