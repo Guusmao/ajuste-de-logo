@@ -297,14 +297,10 @@ function drawTicks(w, h){
 
 toleranceEl.addEventListener('input', render);
 featherEl.addEventListener('input', render);
-transparentBgEl.addEventListener('change', ()=>{
-  padColorEl.disabled = transparentBgEl.checked;
-  render();
-});
+transparentBgEl.addEventListener('change', render);
 autoCropBgEl.addEventListener('change', ()=>{
   if(autoCropBgEl.checked){
     transparentBgEl.checked = false;
-    padColorEl.disabled = false;
     padColorEl.value = '#ffffff';
   }
   render();
