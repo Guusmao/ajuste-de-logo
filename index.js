@@ -14,6 +14,7 @@ let srcCanvas = null, srcCtx = null;
 let outCanvas = null, outCtx = null;
 let pickPoint = null;
 let targetW = 512, targetH = 512;
+let autoUpscaleQuality = 1;
 
 document.querySelectorAll('.size-opt').forEach(el=>{
   el.addEventListener('click', ()=>{
@@ -38,6 +39,14 @@ fileInput.addEventListener('change', e=>{
   if(e.target.files[0]) loadFile(e.target.files[0]);
 });
 
+function detectImageQuality(width, height) {
+  const minDim = Math.min(width, height);
+  if (minDim <= 200) return 4;
+  if (minDim <= 300) return 3;
+  if (minDim <= 450) return 2;
+  return 1;
+}
+
 function loadFile(file){
   if (file.type === 'application/pdf') {
     handlePdf(file);
@@ -50,6 +59,9 @@ function loadFile(file){
       img = image;
       pickPoint = null;
       pickedColorLabel.textContent = 'canto superior esquerdo';
+      autoUpscaleQuality = detectImageQuality(img.width, img.height);
+      document.getElementById('upscaleQuality').value = autoUpscaleQuality;
+      updateQualityLabel();
       buildLayout();
       render();
       downloadBtn.disabled = false;
@@ -255,9 +267,32 @@ function cropCanvas(canvas, bounds){
   return cropped;
 }
 
+function applyPreviewUpscaling(canvas, qualityLevel) {
+  const upscale = getUpscaleFactor(canvas.width, canvas.height, qualityLevel);
+  if (upscale <= 1) return canvas;
+
+  const upscaled = document.createElement('canvas');
+  upscaled.width = canvas.width * upscale;
+  upscaled.height = canvas.height * upscale;
+  const uctx = upscaled.getContext('2d');
+  uctx.imageSmoothingEnabled = true;
+  uctx.drawImage(canvas, 0, 0, upscaled.width, upscaled.height);
+  applyUnsharpMask(upscaled);
+
+  const downscaled = document.createElement('canvas');
+  downscaled.width = canvas.width;
+  downscaled.height = canvas.height;
+  const dctx = downscaled.getContext('2d');
+  dctx.imageSmoothingEnabled = true;
+  dctx.drawImage(upscaled, 0, 0, upscaled.width, upscaled.height, 0, 0, canvas.width, canvas.height);
+  return downscaled;
+}
+
 function render(){
   if(!img) return;
   let cleaned = removeBackground();
+
+  cleaned = applyPreviewUpscaling(cleaned, autoUpscaleQuality);
 
   if(autoCropBgEl.checked){
     cleaned = cleanupSoftEdges(cleaned);
@@ -307,12 +342,38 @@ autoCropBgEl.addEventListener('change', ()=>{
 });
 padColorEl.addEventListener('input', render);
 
-function getUpscaleFactor(imgWidth, imgHeight) {
+document.getElementById('upscaleQuality').addEventListener('input', ()=>{
+  updateQualityLabel();
+  render();
+});
+
+function getUpscaleFactor(imgWidth, imgHeight, qualityLevel = autoUpscaleQuality) {
   const minDim = Math.min(imgWidth, imgHeight);
-  if (minDim <= 256) return 4;
-  if (minDim <= 384) return 3;
-  if (minDim <= 512) return 2;
-  return 1.5;
+  const baseFactors = {
+    1: minDim <= 256 ? 1 : 1,
+    1.5: minDim <= 256 ? 2 : 1.5,
+    2: minDim <= 256 ? 3 : (minDim <= 384 ? 2 : 1.5),
+    2.5: minDim <= 256 ? 4 : (minDim <= 384 ? 3 : 2),
+    3: minDim <= 256 ? 5 : (minDim <= 384 ? 4 : 3),
+    3.5: minDim <= 256 ? 6 : (minDim <= 384 ? 5 : 4),
+    4: minDim <= 256 ? 8 : (minDim <= 384 ? 6 : 5),
+  };
+  return baseFactors[qualityLevel] || 1;
+}
+
+function updateQualityLabel() {
+  const level = parseFloat(document.getElementById('upscaleQuality').value);
+  const labels = {
+    1: 'Baixa (1x)',
+    1.5: 'Média (1.5x)',
+    2: 'Alta (2x)',
+    2.5: 'Muito alta (2.5x)',
+    3: 'Ultra (3x)',
+    3.5: 'Ultra+ (3.5x)',
+    4: 'Máxima (4x)',
+  };
+  document.getElementById('qualityLabel').textContent = labels[level] || 'Automático';
+  autoUpscaleQuality = level;
 }
 
 function applyUnsharpMask(canvas, strength = 1.2) {
@@ -320,6 +381,17 @@ function applyUnsharpMask(canvas, strength = 1.2) {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
   const w = canvas.width, h = canvas.height;
+
+  const strengthMap = {
+    1: 0.8,
+    1.5: 1.0,
+    2: 1.3,
+    2.5: 1.6,
+    3: 1.9,
+    3.5: 2.2,
+    4: 2.5,
+  };
+  const finalStrength = strengthMap[autoUpscaleQuality] !== undefined ? strengthMap[autoUpscaleQuality] : strength;
 
   for (let i = 0; i < data.length; i += 4) {
     const pixelIndex = i / 4;
@@ -336,7 +408,7 @@ function applyUnsharpMask(canvas, strength = 1.2) {
 
         const avg = (top + bottom + left + right) / 4;
         const diff = center - avg;
-        data[i + c] = Math.min(255, Math.max(0, center + diff * strength));
+        data[i + c] = Math.min(255, Math.max(0, center + diff * finalStrength));
       }
     }
   }
@@ -354,7 +426,7 @@ downloadBtn.addEventListener('click', ()=>{
     if(bounds) cleaned = cropCanvas(cleaned, bounds);
   }
 
-  const upscale = getUpscaleFactor(img.width, img.height);
+  const upscale = getUpscaleFactor(img.width, img.height, autoUpscaleQuality);
   const finalW = targetW * upscale;
   const finalH = targetH * upscale;
   const upscaled = document.createElement('canvas');
