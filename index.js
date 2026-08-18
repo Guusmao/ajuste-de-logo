@@ -271,19 +271,14 @@ function applyPreviewUpscaling(canvas, qualityLevel) {
   const upscale = getUpscaleFactor(canvas.width, canvas.height, qualityLevel);
   if (upscale <= 1) return canvas;
 
-  const upscaled = document.createElement('canvas');
-  upscaled.width = canvas.width * upscale;
-  upscaled.height = canvas.height * upscale;
-  const uctx = upscaled.getContext('2d');
-  uctx.imageSmoothingEnabled = true;
-  uctx.drawImage(canvas, 0, 0, upscaled.width, upscaled.height);
-  applyUnsharpMask(upscaled);
+  const upscaled = multiPassUpscale(canvas, upscale, qualityLevel);
 
   const downscaled = document.createElement('canvas');
   downscaled.width = canvas.width;
   downscaled.height = canvas.height;
   const dctx = downscaled.getContext('2d');
   dctx.imageSmoothingEnabled = true;
+  dctx.imageSmoothingQuality = 'high';
   dctx.drawImage(upscaled, 0, 0, upscaled.width, upscaled.height, 0, 0, canvas.width, canvas.height);
   return downscaled;
 }
@@ -383,13 +378,13 @@ function applyUnsharpMask(canvas, strength = 1.2) {
   const w = canvas.width, h = canvas.height;
 
   const strengthMap = {
-    1: 0.8,
-    1.5: 1.0,
-    2: 1.3,
-    2.5: 1.6,
-    3: 1.9,
-    3.5: 2.2,
-    4: 2.5,
+    1: 1.2,
+    1.5: 1.5,
+    2: 1.8,
+    2.5: 2.1,
+    3: 2.4,
+    3.5: 2.7,
+    4: 3.0,
   };
   const finalStrength = strengthMap[autoUpscaleQuality] !== undefined ? strengthMap[autoUpscaleQuality] : strength;
 
@@ -416,6 +411,65 @@ function applyUnsharpMask(canvas, strength = 1.2) {
   ctx.putImageData(imageData, 0, 0);
 }
 
+function applyEdgeEnhance(canvas) {
+  const ctx = canvas.getContext('2d', {willReadFrequently: true});
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const w = canvas.width, h = canvas.height;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelIndex = i / 4;
+    const x = pixelIndex % w;
+    const y = Math.floor(pixelIndex / w);
+
+    if (x > 0 && x < w-1 && y > 0 && y < h-1) {
+      for (let c = 0; c < 3; c++) {
+        const center = data[i + c];
+        const neighbors = [
+          data[(i - w*4 - 4) + c], data[(i - w*4) + c], data[(i - w*4 + 4) + c],
+          data[(i - 4) + c], data[(i + 4) + c],
+          data[(i + w*4 - 4) + c], data[(i + w*4) + c], data[(i + w*4 + 4) + c]
+        ];
+        const avg = neighbors.reduce((a, b) => a + b) / neighbors.length;
+        const edge = Math.abs(center - avg);
+        if (edge > 30) {
+          data[i + c] = Math.min(255, Math.max(0, center + (center > avg ? 15 : -15)));
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function multiPassUpscale(canvas, targetScale, qualityLevel) {
+  if (targetScale <= 1) return canvas;
+
+  let current = canvas;
+  const passes = qualityLevel >= 3 ? 3 : (qualityLevel >= 2 ? 2 : 1);
+  const scalePerPass = Math.pow(targetScale, 1 / passes);
+
+  for (let pass = 0; pass < passes; pass++) {
+    const newW = Math.round(current.width * scalePerPass);
+    const newH = Math.round(current.height * scalePerPass);
+
+    const scaled = document.createElement('canvas');
+    scaled.width = newW;
+    scaled.height = newH;
+    const sctx = scaled.getContext('2d');
+    sctx.imageSmoothingEnabled = true;
+    sctx.imageSmoothingQuality = 'high';
+    sctx.drawImage(current, 0, 0, newW, newH);
+
+    applyUnsharpMask(scaled);
+    if (pass === passes - 1) applyEdgeEnhance(scaled);
+
+    current = scaled;
+  }
+
+  return current;
+}
+
 downloadBtn.addEventListener('click', ()=>{
   if(!img) return;
   let cleaned = removeBackground();
@@ -427,32 +481,33 @@ downloadBtn.addEventListener('click', ()=>{
   }
 
   const upscale = getUpscaleFactor(img.width, img.height, autoUpscaleQuality);
+  const upscaled = multiPassUpscale(cleaned, upscale, autoUpscaleQuality);
+
   const finalW = targetW * upscale;
   const finalH = targetH * upscale;
-  const upscaled = document.createElement('canvas');
-  upscaled.width = finalW;
-  upscaled.height = finalH;
-  const uctx = upscaled.getContext('2d');
-  uctx.imageSmoothingEnabled = true;
+  const canvas = document.createElement('canvas');
+  canvas.width = finalW;
+  canvas.height = finalH;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
   if(!transparentBgEl.checked){
-    uctx.fillStyle = padColorEl.value;
-    uctx.fillRect(0,0,finalW, finalH);
+    ctx.fillStyle = padColorEl.value;
+    ctx.fillRect(0,0,finalW, finalH);
   }
-  const scale = Math.min(finalW / cleaned.width, finalH / cleaned.height);
-  const drawW = cleaned.width * scale;
-  const drawH = cleaned.height * scale;
+  const scale = Math.min(finalW / upscaled.width, finalH / upscaled.height);
+  const drawW = upscaled.width * scale;
+  const drawH = upscaled.height * scale;
   const dx = (finalW - drawW) / 2;
   const dy = (finalH - drawH) / 2;
-  uctx.drawImage(cleaned, dx, dy, drawW, drawH);
-
-  applyUnsharpMask(upscaled);
+  ctx.drawImage(upscaled, dx, dy, drawW, drawH);
 
   const final = document.createElement('canvas');
   final.width = targetW;
   final.height = targetH;
   const fctx = final.getContext('2d');
   fctx.imageSmoothingEnabled = true;
-  fctx.drawImage(upscaled, 0, 0, finalW, finalH, 0, 0, targetW, targetH);
+  fctx.imageSmoothingQuality = 'high';
+  fctx.drawImage(canvas, 0, 0, finalW, finalH, 0, 0, targetW, targetH);
 
   final.toBlob(blob=>{
     const url = URL.createObjectURL(blob);
